@@ -1,0 +1,63 @@
+const int ledPin = 23;
+const long dotDuration = 100;
+const long dashDuration = 3 * dotDuration;
+const long interElementSpace = dotDuration;
+const long interCharacterSpace = 3 * dotDuration;
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  if (Serial.available()) {
+    String inputStr = Serial.readStringUntil('\n');
+    
+    for (int i = 0; i < inputStr.length(); i++) {
+      char c = inputStr.charAt(i);
+      if (c == ' ') {
+        delay(7 * dotDuration);
+      } else {
+        charToMorseAndBlink(c);
+        delay(interCharacterSpace);
+      }
+    }
+    Serial.println();
+  }
+}
+
+void charToMorseAndBlink(char c) {
+  char morseCode[] = "----- .---- ..--- ...-- ....- ..... -.... --... ---.. ----. ";
+  if (isLowerCase(c)) {
+    c = toUpperCase(c);
+  }
+  if ((c >= '0' && c <= '9') || c == ' ') {
+    int index = c - '0';
+    String morse = "";
+    while (morseCode[index] != ' ') {
+      morse += morseCode[index];
+      index++;
+    }
+    blinkMorse(morse);
+  } else {
+    blinkMorse(" ");
+  }
+}
+
+void blinkMorse(String morse) {
+  for (int j = 0; j < morse.length(); j++) {
+    char symbol = morse.charAt(j);
+    if (symbol == '.') {
+      digitalWrite(ledPin, HIGH);
+      delay(dotDuration);
+      digitalWrite(ledPin, LOW);
+      delay(interElementSpace);
+    } else if (symbol == '-') {
+      digitalWrite(ledPin, HIGH);
+      delay(dashDuration);
+      digitalWrite(ledPin, LOW);
+      delay(interElementSpace);
+    }
+  }
+}
+
