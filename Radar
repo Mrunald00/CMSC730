@@ -1,0 +1,63 @@
+///WORKING RADAR CODE
+
+const int servoPin = 13; 
+int angle = 0;          
+int increment = 1;      
+int delayTime = 15;     
+
+const int trigPin = 2;
+const int echoPin = 4;
+
+void setup() {
+  pinMode(servoPin, OUTPUT); 
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  moveServo(angle);
+
+  angle += increment;
+
+  if (angle >= 180 || angle <= 0) {
+    increment = -increment; 
+  }
+
+  int distance = dist();
+
+  delay(delayTime); 
+}
+
+void moveServo(int servoAngle) {
+  
+  int pulseWidth = map(servoAngle, 0, 180, 544, 2400); 
+  digitalWrite(servoPin, HIGH);
+  delayMicroseconds(pulseWidth);
+  digitalWrite(servoPin, LOW);
+}
+
+int dist() {
+  long duration;
+  int distance = -1;
+
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH);
+
+  distance = (duration / 2) / 29.1; 
+  if(distance >= 20)
+  {
+    Serial.println("Out of range");
+  }
+  else
+  {
+    Serial.print(distance);
+    Serial.println(" cm");
+  }
+  return distance;
+}
