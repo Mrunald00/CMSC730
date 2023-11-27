@@ -1,0 +1,97 @@
+#include <Wire.h>
+
+#define MPU9250_ADDRESS 0x68 // MPU9250 I2C address
+
+const int sda = 21;
+const int scl = 22;
+
+float gyroXAngle = 0.0;
+float gyroYAngle = 0.0;
+float gyroZAngle = 0.0;
+
+// Calibration values
+float gyroXOffset = 0.0;
+float gyroYOffset = 0.0;
+float gyroZOffset = 0.0;
+
+void calibrateGyro() {
+  const int numSamples = 1000; // Adjust the number of samples as needed
+  float gyroXSum = 0.0;
+  float gyroYSum = 0.0;
+  float gyroZSum = 0.0;
+
+  // Collect stationary data for calibration
+  for (int i = 0; i < numSamples; ++i) {
+    Wire.beginTransmission(MPU9250_ADDRESS);
+    Wire.write(0x43); // Starting register for gyroscope data
+    Wire.endTransmission(false);
+    Wire.requestFrom((uint8_t)MPU9250_ADDRESS, (uint8_t)6, (uint8_t)true);
+
+    int16_t gyroX, gyroY, gyroZ;
+    gyroX = Wire.read() << 8 | Wire.read();
+    gyroY = Wire.read() << 8 | Wire.read();
+    gyroZ = Wire.read() << 8 | Wire.read();
+
+    gyroXSum += gyroX / 131.0;
+    gyroYSum += gyroY / 131.0;
+    gyroZSum += gyroZ / 131.0;
+
+    delay(10); // Adjust the delay as needed
+  }
+
+  // Calculate average offsets
+  gyroXOffset = gyroXSum / numSamples;
+  gyroYOffset = gyroYSum / numSamples;
+  gyroZOffset = gyroZSum / numSamples;
+}
+
+void setup() {
+  Wire.begin(sda, scl); // SDA, SCL
+  Serial.begin(9600);
+
+  // Initialize the MPU9250
+  Wire.beginTransmission(MPU9250_ADDRESS);
+  Wire.write(0x6B); // PWR_MGMT_1 register
+  Wire.write(0);    // Wake up the MPU-9250
+  Wire.endTransmission(true);
+
+  // Calibrate the gyroscope
+  calibrateGyro();
+}
+
+void loop() {
+  // Request and read gyroscope data
+  Wire.beginTransmission(MPU9250_ADDRESS);
+  Wire.write(0x43); // Starting register for gyroscope data
+  Wire.endTransmission(false);
+  Wire.requestFrom((uint8_t)MPU9250_ADDRESS, (uint8_t)6, (uint8_t)true);
+
+  int16_t gyroX, gyroY, gyroZ;
+  gyroX = Wire.read() << 8 | Wire.read();
+  gyroY = Wire.read() << 8 | Wire.read();
+  gyroZ = Wire.read() << 8 | Wire.read();
+
+  // Calculate gyroscope values in degrees per second with calibration
+  float gyroX_dps = (gyroX / 131.0) - gyroXOffset;
+  float gyroY_dps = (gyroY / 131.0) - gyroYOffset;
+  float gyroZ_dps = (gyroZ / 131.0) - gyroZOffset;
+
+  // Integrate gyroscope data to obtain rotational angles
+  gyroXAngle += gyroX_dps * 0.1; // 0.1 is the integration time (seconds)
+  gyroYAngle += gyroY_dps * 0.1;
+  gyroZAngle += gyroZ_dps * 0.1;
+
+  // Reset angles when they exceed 360 degrees
+  if (gyroXAngle >= 360.0) gyroXAngle -= 360.0;
+  if (gyroYAngle >= 360.0) gyroYAngle -= 360.0;
+  if (gyroZAngle >= 360.0) gyroZAngle -= 360.0;
+
+  // Print data for the Serial Plotter
+  Serial.print(gyroXAngle, 6);
+  Serial.print("\t");
+  Serial.print(gyroYAngle, 6);
+  Serial.print("\t");
+  Serial.println(gyroZAngle, 6);
+
+  delay(100); // Adjust the delay as needed for the Serial Plotter
+}
