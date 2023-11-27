@@ -1,0 +1,79 @@
+#include <Wire.h>
+
+#define MPU9250_ADDRESS 0x68 // MPU9250 I2C address
+
+const int sda = 21;
+const int scl = 22;
+
+bool plotAccelerometer = true; // Control accelerometer data plot
+bool plotGyroscope = true;     // Control gyroscope data plot
+
+void setup() {
+  Wire.begin(sda, scl); // SDA, SCL
+  Serial.begin(9600);
+
+  // Initialize the MPU9250
+  Wire.beginTransmission(MPU9250_ADDRESS);
+  Wire.write(0x6B); // PWR_MGMT_1 register
+  Wire.write(0);    // Wake up the MPU-9250
+  Wire.endTransmission(true);
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    char input = Serial.read();
+    if (input == 'a' || input == 'A') {
+      plotAccelerometer = !plotAccelerometer; // Toggle accelerometer plot
+    } else if (input == 'g' || input == 'G') {
+      plotGyroscope = !plotGyroscope; // Toggle gyroscope plot
+    }
+  }
+
+  // Request and read accelerometer data
+  Wire.beginTransmission(MPU9250_ADDRESS);
+  Wire.write(0x3B); // Starting register for accelerometer data
+  Wire.endTransmission(false);
+  Wire.requestFrom((uint8_t)MPU9250_ADDRESS, (uint8_t)6, (uint8_t)true);
+
+  int16_t accelX, accelY, accelZ;
+  accelX = Wire.read() << 8 | Wire.read();
+  accelY = Wire.read() << 8 | Wire.read();
+  accelZ = Wire.read() << 8 | Wire.read();
+
+  // Calculate accelerometer values in g
+  float accelX_g = accelX / 16384.0;
+  float accelY_g = accelY / 16384.0;
+  float accelZ_g = accelZ / 16384.0;
+
+  // Request and read gyroscope data
+  Wire.beginTransmission(MPU9250_ADDRESS);
+  Wire.write(0x43); // Starting register for gyroscope data
+  Wire.endTransmission(false);
+  Wire.requestFrom((uint8_t)MPU9250_ADDRESS, (uint8_t)6, (uint8_t)true);
+
+  int16_t gyroX, gyroY, gyroZ;
+  gyroX = Wire.read() << 8 | Wire.read();
+  gyroY = Wire.read() << 8 | Wire.read();
+  gyroZ = Wire.read() << 8 | Wire.read();
+
+  // Print data based on user input
+  if (plotAccelerometer) {
+    Serial.print("Accelerometer X (g): ");
+    Serial.print(accelX_g, 3);
+    Serial.print(" Y (g): ");
+    Serial.print(accelY_g, 3);
+    Serial.print(" Z (g): ");
+    Serial.println(accelZ_g, 3);
+  }
+
+  if (plotGyroscope) {
+    Serial.print("Gyroscope X (raw): ");
+    Serial.print(gyroX);
+    Serial.print(" Y (raw): ");
+    Serial.print(gyroY);
+    Serial.print(" Z (raw): ");
+    Serial.println(gyroZ);
+  }
+  
+  delay(100); // Adjust the delay as needed for the Serial Plotter
+}
