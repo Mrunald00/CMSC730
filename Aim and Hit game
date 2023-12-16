@@ -1,0 +1,211 @@
+Link to Video: https://youtu.be/4wts9i1vfp8
+
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+#define SCREEN_ADDRESS 0x3C
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+const int targetSize = 5;
+int targetX, targetY;
+int playerRandomX, playerRandomY;
+int playerMPUX, playerMPUY;
+
+unsigned long startTime;
+unsigned long gameDuration = 30000; // 30 seconds
+bool gameActive = false;
+
+const int joyX_pin = 13;
+const int joyY_pin = 12;
+
+int difficultyLevel = 1;
+int maxTargets = 3;
+
+// Function declaration
+void displayTimer();
+
+void setup() {
+  Serial.begin(115200);
+
+  Wire.begin();
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;)
+      ;
+  }
+
+  display.display();
+  delay(2000);
+  display.clearDisplay();
+
+  askForDifficultyLevel();
+
+  targetX = random(SCREEN_WIDTH - targetSize);
+  targetY = random(SCREEN_HEIGHT - targetSize);
+  playerRandomX = random(SCREEN_WIDTH - 3);
+  playerRandomY = random(SCREEN_HEIGHT - 3);
+  playerMPUX = SCREEN_WIDTH / 2;
+  playerMPUY = SCREEN_HEIGHT / 2;
+
+  displayTarget();
+  displayPlayers();
+
+  delay(2000);
+  startGame();
+}
+
+void askForDifficultyLevel() {
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(10, 10);
+  display.println("Choose difficulty level:");
+  display.setCursor(10, 25);
+  display.println("1 ");
+  display.setCursor(10, 40);
+  display.println("2 ");
+  display.setCursor(10, 55);
+  display.println("3");
+  display.display();
+
+  // Wait for joystick input to choose difficulty level
+  while (true) {
+    int joyX = digitalRead(joyX_pin);
+    if (joyX == HIGH) {
+      difficultyLevel = 1;
+      break;
+    }
+
+    int joyY = digitalRead(joyY_pin);
+    if (joyY == HIGH) {
+      difficultyLevel = 2;
+      break;
+    }
+
+    // Additional conditions for choosing difficulty level 3 can be added if needed
+  }
+
+  display.clearDisplay();
+}
+
+void displayTarget() {
+  display.clearDisplay();
+  display.fillRect(targetX, targetY, targetSize, targetSize, WHITE);
+  display.display();
+}
+
+void displayPlayers() {
+  display.fillRect(playerRandomX, playerRandomY, 3, 3, WHITE);
+  display.fillRect(playerMPUX, playerMPUY, 3, 3, WHITE);
+  display.display();
+}
+
+void startGame() {
+  display.clearDisplay();
+  display.display();
+  startTime = millis();
+  gameActive = true;
+}
+
+void endGame() {
+  unsigned long endTime = millis();
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(10, 10);
+  display.print("Yayy!");
+  display.setCursor(10, 30);
+  display.print("Time: ");
+  display.print((endTime - startTime) / 1000);
+  display.display();
+  delay(5000);
+  gameActive = false;
+  resetGame();
+}
+
+void resetGame() {
+  targetX = random(SCREEN_WIDTH - targetSize);
+  targetY = random(SCREEN_HEIGHT - targetSize);
+  playerRandomX = random(SCREEN_WIDTH - 3);
+  playerRandomY = random(SCREEN_HEIGHT - 3);
+  playerMPUX = SCREEN_WIDTH / 2;
+  playerMPUY = SCREEN_HEIGHT / 2;
+  displayTarget();
+  displayPlayers();
+  delay(2000);
+}
+
+void loop() {
+  if (gameActive) {
+    moveRandomPlayer();
+    moveMPUPlayer();
+    display.clearDisplay();
+    displayTarget();
+    displayPlayers();
+    displayTimer();
+    display.display();
+    if (collisionDetected()) {
+      endGame();
+    }
+  }
+}
+
+void moveRandomPlayer() {
+  playerRandomX = constrain(playerRandomX + random(-2, 3), 0, SCREEN_WIDTH - 3);
+  playerRandomY = constrain(playerRandomY + random(-2, 3), 0, SCREEN_HEIGHT - 3);
+}
+
+void moveMPUPlayer() {
+  int16_t accelerometerX, accelerometerY, accelerometerZ;
+  readAccelerometerData(accelerometerX, accelerometerY, accelerometerZ);
+  int movementX = map(accelerometerY, -16384, 16383, -2, 2);
+  int movementY = map(accelerometerX, -16384, 16383, -2, 2);
+  playerMPUX = constrain(playerMPUX + movementX, 0, SCREEN_WIDTH - 3);
+  playerMPUY = constrain(playerMPUY + movementY, 0, SCREEN_HEIGHT - 3);
+}
+
+void readAccelerometerData(int16_t &accelX, int16_t &accelY, int16_t &accelZ) {
+  Wire.beginTransmission(0x68); // MPU9250 address
+  Wire.write(0x3B);             // Starting register for accelerometer data
+  Wire.endTransmission(false);
+  Wire.requestFrom(0x68, 6, true);
+
+  accelX = (Wire.read() << 8) | Wire.read();
+  accelY = (Wire.read() << 8) | Wire.read();
+  accelZ = (Wire.read() << 8) | Wire.read();
+}
+
+bool collisionDetected() {
+  return (playerRandomX + 3 >= targetX && playerRandomX <= targetX + targetSize &&
+          playerRandomY + 3 >= targetY && playerRandomY <= targetY + targetSize) ||
+         (playerMPUX + 3 >= targetX && playerMPUX <= targetX + targetSize &&
+          playerMPUY + 3 >= targetY && playerMPUY <= targetY + targetSize);
+}
+
+void setDifficultyLevel() {
+  // Adjust difficulty level based on joystick input
+  int joyX = digitalRead(joyX_pin);
+  if (joyX == HIGH) {
+    difficultyLevel = 1;
+  }
+
+  int joyY = digitalRead(joyY_pin);
+  if (joyY == HIGH) {
+    difficultyLevel = 2;
+  }
+}
+
+void displayTimer() {
+  unsigned long currentTime = millis();
+  unsigned long elapsedTime = (currentTime - startTime) / 1000;
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(10, 54);
+  display.print("Time: ");
+  display.print(elapsedTime);
+}
